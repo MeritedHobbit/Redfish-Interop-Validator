@@ -325,7 +325,7 @@ def createResourceObject(name, uri, jsondata=None, typename=None, context=None, 
     """
     Factory for resource object, move certain work here
     """    # Create json from service or from given
-
+    print(uri)
     if jsondata is None and not isComplex:
         success, jsondata, status, rtime = callResourceURI(uri)
         traverseLogger.debug('{}, {}, {}'.format(success, jsondata, status))

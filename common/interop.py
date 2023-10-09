@@ -5,11 +5,12 @@
 
 import re, copy
 from enum import Enum
+import json
 from collections import Counter
 
 import logging
 from common.redfish import getNamespaceUnversioned, getType, getNamespace
-from traverseInterop import callResourceURI
+from traverseInterop import callResourceURI, createResourceObject
 my_logger = logging.getLogger()
 my_logger.setLevel(logging.DEBUG)
 
@@ -441,10 +442,8 @@ def validatePropertyRequirement(propResourceObj, profile_entry, rf_payload_tuple
     """
     msgs = []
     counts = Counter()
-
     # TODO: Change rf_payload_tuple to a more natural implementation (like an object)
     redfish_value, redfish_parent_payload = rf_payload_tuple
-
     if profile_entry is None or len(profile_entry) == 0:
         my_logger.debug('there are no requirements for this prop')
     else:
@@ -496,7 +495,27 @@ def validatePropertyRequirement(propResourceObj, profile_entry, rf_payload_tuple
             except ValueError as e:
                 my_logger.info("\tCondition was skipped due to payload error")
                 counts['errorProfileComparisonError'] += 1
-
+    # if "NestedPropertyRequirements" in profile_entry:
+    #     uri = propResourceObj.jsondata[item_name]["@odata.id"]
+    #     print("URI: ", uri)
+    #     print(item_name)
+    #     success, rf_payload_action, code, elapsed  = callResourceURI("hmc" + uri)
+    #     print(rf_payload_action)
+    #     innerDict = profile_entry["NestedPropertyRequirements"]
+    #     # print(r_val["Subscriptions"])
+    #     # r_val = resource_obj.jsondata
+    #     for item in innerDict:
+    #         print("Item", item)
+    #         print(rf_payload_action[item])
+    #         resource_obj, _ = createResourceObject(item, "hmc" + rf_payload_action[item]["@odata.id"])
+    #         print(resource_obj.jsondata)
+    #         # NOTE: Program no longer performs fuzzy checks for misnamed properties, since there is no schema
+    #         # my_logger.info('### Validating PropertyRequirements for {}'.format(item))
+    #         pmsgs, pcounts = validatePropertyRequirement(resource_obj, innerDict[item], (rf_payload_action.get(item, REDFISH_ABSENT), rf_payload_tuple), item)
+    #         counts.update(pcounts)
+    #         msgs.extend(pmsgs)
+        # import sys
+        # sys.exit(1)
     # If we're working with a list, then consider MinCount, Comparisons, then execute on each item
     # list based comparisons include AnyOf and AllOf
     if isinstance(redfish_value, list):
@@ -524,7 +543,6 @@ def validatePropertyRequirement(propResourceObj, profile_entry, rf_payload_tuple
         msg, success = validateRequirement(profile_entry.get('ReadRequirement', 'Mandatory'), redfish_value, parent_object_tuple=redfish_parent_payload)
         msgs.append(msg)
         msg.name = item_name + '.' + msg.name
-
         if "WriteRequirement" in profile_entry:
             msg, success = validateWriteRequirement(propResourceObj, profile_entry["WriteRequirement"], item_name)
             msgs.append(msg)
@@ -656,8 +674,11 @@ def compareRedfishURI(expected_uris, uri):
     # If we have our URIs
     if expected_uris is not None:
         my_uri_regex = "^{}$".format("|".join(expected_uris))
+        print(my_uri_regex, "*************************")
         my_uri_regex = re.sub(URI_ID_REGEX, VALID_ID_REGEX, my_uri_regex)
+        print(my_uri_regex, "*************************")
         success = re.fullmatch(my_uri_regex, uri) is not None
+        print(uri, success)
     else:
         success = True
     return success
@@ -667,21 +688,24 @@ def checkInteropURI(r_obj, profile_entry):
     Checks if the profile's URI applies to the particular resource
     """
     my_logger.debug('Testing URI \n\t' + str((r_obj.uri, profile_entry)))
+    print('Testing URI \n\t' + str((r_obj.uri, profile_entry)))
 
     my_id, my_uri = r_obj.jsondata.get('Id'), r_obj.uri
+    print("ID: ", my_id)
     return compareRedfishURI(profile_entry, my_uri)
+msgs = []
 
-def validateInteropResource(propResourceObj, interop_profile, rf_payload):
+def validateInteropResource(propResourceObj, interop_profile, rf_payload, passthrough="", wc_token=""):
     """
     Base function that validates a single Interop Resource by its profile_entry
     """
-    msgs = []
+    global msgs
     my_logger.info('### Validating an InteropResource')
     my_logger.debug(str(interop_profile))
     counts = Counter()
     # rf_payload_tuple provides the chain of dicts containing dicts, needed for CompareProperty
     rf_payload_tuple = (rf_payload, None)
-
+    print(wc_token)
     if "UseCases" in interop_profile:
         for use_case in interop_profile['UseCases']:
             entry_title = use_case.get("UseCaseTitle", "NoName").replace(' ','_')
@@ -716,7 +740,7 @@ def validateInteropResource(propResourceObj, interop_profile, rf_payload):
                 # Remove URIs
                 new_case = {key: val for key, val in use_case.items() if key not in ['URIs']}
 
-                new_msgs, new_counts = validateInteropResource(propResourceObj, new_case, rf_payload)
+                new_msgs, new_counts = validateInteropResource(propResourceObj, new_case, rf_payload, wc_token)
 
                 if any([msg.success == sEnum.FAIL for msg in new_msgs]):
                     my_msg.success = sEnum.FAIL
@@ -746,6 +770,49 @@ def validateInteropResource(propResourceObj, interop_profile, rf_payload):
             pmsgs, pcounts = validatePropertyRequirement(propResourceObj, innerDict[item], (rf_payload.get(item, REDFISH_ABSENT), rf_payload_tuple), item)
             counts.update(pcounts)
             msgs.extend(pmsgs)
+    if "NestedPropertyRequirements" in interop_profile:
+        innerDict = interop_profile["NestedPropertyRequirements"]
+        for item in innerDict:
+            uri = propResourceObj.jsondata[item]["@odata.id"]
+            resource_obj, _ = createResourceObject(item, passthrough + uri)
+            # success, rf_payload_action, code, elapsed  = callResourceURI("hmc" + uri)
+            # print(rf_payload_action)
+            validateInteropResource(resource_obj, innerDict[item], resource_obj.jsondata,passthrough, wc_token)
+            # NOTE: Program no longer performs fuzzy checks for misnamed properties, since there is no schema
+            my_logger.info('### Validating NestedPropertyRequirements for {}'.format(item))
+            # pmsgs, pcounts = validatePropertyRequirement(propResourceObj, innerDict[item], (rf_payload.get(item, REDFISH_ABSENT), rf_payload_tuple), item)
+            # counts.update(pcounts)
+            # msgs.extend(pmsgs)
+        # import sys
+        # sys.exit(1)
+    if "NestedArrayRequirements" in interop_profile:
+        inner_dict = interop_profile["NestedArrayRequirements"]
+        tokens= []
+        uris = []
+        inner_prop = []
+        for item in inner_dict:
+            # for inner_item in item:
+            inner_item = interop_profile["NestedArrayRequirements"][item]
+            uris.extend(propResourceObj.jsondata[item])
+            for i in inner_item:
+                if i.startswith("<") and i.endswith(">"):
+                    d = i[1:-1]
+                    if d in wc_token:
+                        inner_prop.append({"tokens": wc_token[d], "profile": inner_item[i]})
+                        tokens.extend(wc_token[d])
+        for prop in inner_prop:
+            tokens = prop["tokens"]
+            i_prop = prop["profile"]
+            for t in tokens:
+                for uri in uris:
+                    if t in uri["@odata.id"].split("/")[-1]:
+                        resource_obj, _ = createResourceObject(t, passthrough + uri["@odata.id"])
+                        validateInteropResource(resource_obj, i_prop, resource_obj.jsondata, wc_token)
+                # tasks = propResourceObj.jsondata.get("Members", {})
+                # for i in tasks:
+                #     print(i["@odata.id"])
+        # import sys
+        # sys.exit(1)
     if "ActionRequirements" in interop_profile:
         innerDict = interop_profile["ActionRequirements"]
         actionsJson = rf_payload.get('Actions', {})

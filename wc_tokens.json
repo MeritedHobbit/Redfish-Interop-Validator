@@ -1,0 +1,5 @@
+{
+    "TASK_ID": ["0","1","2"],
+    "AMC": ["HGX_BMC_0", "HGX_BMC_1"],
+    "AMC_01": ["HGX_BMC_0", "HGX_BMC_1"]
+}

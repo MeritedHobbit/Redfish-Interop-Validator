@@ -1,0 +1,26 @@
+{
+	"SchemaDefinition": "RedfishChassisTest.v1_0_0",
+	"ProfileName": "OCPChassisTest",
+	"ProfileVersion": "1.0.1",
+	"Purpose": "Specifies the OCP baseline hardware management requirements for the Redfish interface on platforms.",
+	"OwningEntity": "Open Compute Project",
+	"ContactInfo": "hwpl@opencompute.org",
+	"Protocol": {
+		"MinVersion": "1.0",
+		"Discovery": "Recommended",
+		"HostInterface": "Recommended"
+	},
+	"Resources": {
+		"ChassisCollection": {
+			"@odata.id":{},
+			"Name": {},
+			"Chassis":{
+				"PropertyRequirements": {
+					"Manufacturer": {},
+					"Model": {},
+					"SerialNumber": {}
+				}
+			}
+		}
+	}
+}

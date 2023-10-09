@@ -8,7 +8,7 @@ from io import StringIO
 
 import traverseInterop
 import common.interop as interop
-from common.redfish import getType, getNamespace
+from common.redfish import getType,getID, getNamespace
 from common.interop import REDFISH_ABSENT
 
 my_logger = logging.getLogger()
@@ -46,12 +46,14 @@ def get_my_capture(this_logger, handler):
     return strings
 
 
-def validateSingleURI(URI, profile, uriName='', expectedType=None, expectedSchema=None, expectedJson=None, parent=None):
+def validateSingleURI(URI, profile, uriName='', expectedType=None, expectedSchema=None, expectedJson=None, parent=None, pass_through="", wc_tokens=""):
     """
     Validates a single URI that is given, returning its ResourceObject, counts and links
     """
     # rs-assertion: 9.4.1
     # Initial startup here
+    # import pdb
+    # pdb.set_trace()
     counts = Counter()
     results, messages = {}, []
 
@@ -84,6 +86,8 @@ def validateSingleURI(URI, profile, uriName='', expectedType=None, expectedSchem
         my_logger.warning('Tool appears to be missing vital URI information, replacing URI w/: {}'.format(URI))
     # Generate dictionary of property info
     try:
+        if len(pass_through) > 0:
+            URI = pass_through + URI
         resource_obj, return_status = traverseInterop.createResourceObject(
             uriName, URI, expectedJson, expectedType, expectedSchema, parent)
 
@@ -117,15 +121,18 @@ def validateSingleURI(URI, profile, uriName='', expectedType=None, expectedSchem
     my_logger.verbose1("*** {}, {}".format(uriName, URI))
     uriName, SchemaFullType, jsondata = uriName, uriName, resource_obj.jsondata
     SchemaType = getType(jsondata.get('@odata.type', 'NoType'))
+    SchemaID = getID(jsondata.get("@odata.id", "NoID"))
+    print(SchemaType + "/"+ SchemaID )
 
     oemcheck = traverseInterop.config.get('oemcheck', True)
 
     if SchemaType not in profile_resources:
+
         my_logger.verbose1('Visited {}, type {}'.format(URI, SchemaType))
         # Get all links available
         links = getURIsInProperty(jsondata, uriName, oemcheck)
+        # print("LInks: ", links)
         return True, counts, results, links, resource_obj
-
     # Verify odata_id properly resolves to its parent if holding fragment
     odata_id = resource_obj.jsondata.get('@odata.id', '')
     if '#' in odata_id:
@@ -157,8 +164,11 @@ def validateSingleURI(URI, profile, uriName='', expectedType=None, expectedSchem
     my_logger.info("\t Type (%s), GET SUCCESS (time: %s)", resource_obj.typename, resource_obj.rtime)
 
     profile_resources = profile_resources.get(SchemaType)
+    print("Profile: ", profile_resources)
+    print(SchemaType+"/"+SchemaID, "SchemaType")
     try:
-        propMessages, propCounts = interop.validateInteropResource(resource_obj, profile_resources, jsondata)
+        print(wc_tokens)
+        propMessages, propCounts = interop.validateInteropResource(resource_obj, profile_resources, jsondata, pass_through, wc_tokens)
         messages = messages.extend(propMessages)
         counts.update(propCounts)
         my_logger.info('{} of {} tests passed.'.format(counts['pass'] + counts['warn'], counts['totaltests']))
@@ -219,7 +229,7 @@ def getURIfromOdata(property):
             return property
     return None
             
-def validateURITree(URI, profile, uriName, expectedType=None, expectedSchema=None, expectedJson=None):
+def validateURITree(URI, profile, uriName, expectedType=None, expectedSchema=None, expectedJson=None, pass_through="", wc_tokens=""):
     """name
     Validates a Tree of URIs, traversing from the first given
     """
@@ -237,7 +247,7 @@ def validateURITree(URI, profile, uriName, expectedType=None, expectedSchema=Non
 
     # Validate top URI
     validateSuccess, counts, results, links, resource_obj = \
-        validateSingleURI(URI, profile, uriName, expectedType, expectedSchema, expectedJson)
+        validateSingleURI(URI, profile, uriName, expectedType, expectedSchema, expectedJson, pass_through=pass_through, wc_tokens=wc_tokens)
 
     if resource_obj:
         SchemaType = getType(resource_obj.jsondata.get('@odata.type', 'NoType'))
@@ -279,13 +289,12 @@ def validateURITree(URI, profile, uriName, expectedType=None, expectedSchema=Non
                 # NOTE: unable to determine autoexpanded resources without Schema
                 else:
                     linkSuccess, linkCounts, linkResults, innerLinks, linkobj = \
-                        validateSingleURI(link, profile, linkName, parent=parent)
-
+                        validateSingleURI(link, profile, linkName, parent=parent, pass_through=pass_through, wc_tokens=wc_tokens)
                 allLinks.add(link.rstrip('/'))
 
                 results.update(linkResults)
                 counts.update(linkCounts)
-
+                print("Counts : ", counts)
                 if not linkSuccess:
                     continue
 
@@ -317,12 +326,11 @@ def validateURITree(URI, profile, uriName, expectedType=None, expectedSchema=Non
                     resource_stats[SchemaType]['URIsFound'].append(link.rstrip('/'))
                     resource_stats[SchemaType]['SubordinateTo'].add(tuple(reversed(subordinate_tree)))
                     resource_stats[SchemaType]['UseCasesFound'].union(usecases_found)
-
+            print(resource_stats, "==============================")
             if refLinks is not currentLinks and len(newLinks) == 0 and len(refLinks) > 0:
                 currentLinks = refLinks
             else:
                 currentLinks = newLinks
-
         my_logger.info('Service Level Checks')
         # NOTE: readrequirements will likely be errors when using --payload outside of root
         

@@ -1,0 +1,83 @@
+{
+    "SchemaDefinition": "RedfishInteroperabilityProfile.v0_9_0",
+    "ProfileName": "OCPRackManagerController",
+    "ProfileVersion": "1.0.0",
+    "Purpose": "Profile for OpenRMC Rack Manager Controller.",
+    "OwningEntity": "Open Compute Project",
+	"ContributedBy": "Intel Corporation",
+	"License": "Creative Commons Attribution-ShareAlike 4.0 International License",
+    "ContactInfo": "john.leung@opencompute.org",
+    "OwningEntity": "Open Compute Project",
+    "Protocol": {
+        "MinVersion": "1.0"
+    },
+    "Resources": {
+		"ServiceRoot":{
+            "NestedPropertyRequirements":{
+                "EventService":{
+                    "NestedPropertyRequirements":{
+                        "Subscriptions":{
+                            "PropertyRequirements":{
+                                "@odata.id":{},
+                                "@odata.type": {},
+                                "Members": {},
+                                "Members@odata.count": {},
+                                "Name": {}
+                            }
+                        }
+                    }
+                }  ,
+				"Tasks":{
+                    "NestedPropertyRequirements":{
+                        "Tasks":{
+                            "PropertyRequirements":{
+                                "@odata.id":{},
+                                "@odata.type": {},
+                                "Members": {},
+                                "Members@odata.count": {},
+                                "Name": {}
+                            },
+							"NestedArrayRequirements":{
+								"Members":{
+									"<TASK_ID>":{
+										"PropertyRequirements":{
+											"@odata.id": {},
+											  "@odata.type": {},
+											  "EndTime": {},
+											  "Id": {},
+											  "Messages":{
+												  "PropertyRequirements":{
+													  
+												  }
+											  }
+										}
+									}
+								}
+							}
+                        }
+                    }
+                },
+				"Managers":{
+					"PropertyRequirements":{
+						"@odata.id":{},
+						"@odata.type": {},
+						"Members": {},
+						"Members@odata.count": {},
+						"Name": {}
+					},
+					"NestedArrayRequirements":{
+						"Members":{
+							"<AMC>":{
+								"PropertyRequirements":{
+									"Actions_01":{}
+								}
+							}	
+						}
+					}
+				}				
+            }
+			
+			
+        }
+	}
+}

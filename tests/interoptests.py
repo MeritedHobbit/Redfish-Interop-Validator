@@ -8,7 +8,7 @@
 
 from unittest import TestCase
 
-import common.interop as riv
+from common import interop as riv
 
 import logging
 
