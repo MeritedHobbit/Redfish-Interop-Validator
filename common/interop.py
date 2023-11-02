@@ -807,7 +807,7 @@ def validateInteropResource(propResourceObj, interop_profile, rf_payload, passth
                 for uri in uris:
                     if t in uri["@odata.id"].split("/")[-1]:
                         resource_obj, _ = createResourceObject(t, passthrough + uri["@odata.id"])
-                        validateInteropResource(resource_obj, i_prop, resource_obj.jsondata, wc_token)
+                        validateInteropResource(resource_obj, i_prop, resource_obj.jsondata, passthrough, wc_token)
                 # tasks = propResourceObj.jsondata.get("Members", {})
                 # for i in tasks:
                 #     print(i["@odata.id"])
